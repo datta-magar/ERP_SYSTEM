@@ -101,7 +101,9 @@ Open a pull request
 This project is for internal and commercial use by engineering manufacturers. Contact the author for licensing options.
 
 ✉️ Contact
-Developer: Pawan Yadav
-Email: your.email@example.com
+
+Developer: 1. Pawan Yadav
+           2. Datta Magar
+Email: pawanyadav211191@gmail.com
 GitHub: github.com/PawanYadav007s
 
