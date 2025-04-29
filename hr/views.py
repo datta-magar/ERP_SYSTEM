@@ -1,7 +1,8 @@
 from django.shortcuts import render
-from django.http import HttpResponse
-# Create your views here.
+from django.contrib.auth.decorators import login_required
+from .models import Employee
 
-
-def index(request):
-    return HttpResponse("Welcome to HR module")
+@login_required
+def employee_list(request):
+    employees = Employee.objects.all()
+    return render(request, 'hr/employee_list.html', {'employees': employees})
