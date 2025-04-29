@@ -20,5 +20,37 @@ class Item(models.Model):
 
     is_active = models.BooleanField(default=True)                # Soft delete toggle
 
+
+
+
+
+
     def __str__(self):
         return f"{self.name} ({self.item_code})"
+
+
+
+
+class StockTransaction(models.Model):
+    TRANSACTION_TYPE = (
+        ('IN', 'Stock In'),
+        ('OUT', 'Stock Out'),
+    )
+
+    item = models.ForeignKey(Item, on_delete=models.CASCADE)
+    transaction_type = models.CharField(max_length=3, choices=TRANSACTION_TYPE)
+    quantity = models.PositiveIntegerField()
+    date = models.DateTimeField(auto_now_add=True)
+    note = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.transaction_type} - {self.item.name} ({self.quantity})"
+
+
+def save(self, *args, **kwargs):
+    if self.transaction_type == 'IN':
+        self.item.quantity += self.quantity
+    elif self.transaction_type == 'OUT':
+        self.item.quantity -= self.quantity
+    self.item.save()
+    super().save(*args, **kwargs)
