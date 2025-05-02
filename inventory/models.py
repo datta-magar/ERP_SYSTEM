@@ -1,3 +1,4 @@
+'''Pawan's initial code
 from django.db import models
 
 class Item(models.Model):
@@ -54,3 +55,60 @@ def save(self, *args, **kwargs):
         self.item.quantity -= self.quantity
     self.item.save()
     super().save(*args, **kwargs)
+Pawan's initial code'''
+
+'''Datta outliar enhnaced code'''
+# inventory/models.py
+from django.db import models
+
+class BuildingMaterial(models.Model):
+    """Model for building materials like bricks, sand, etc."""
+    name = models.CharField(max_length=100)                   # Red Bricks 4", Crush Sand, etc.
+    code = models.CharField(max_length=50, unique=True)       # Unique product code
+    description = models.TextField(blank=True)                # Optional details
+    
+    UNIT_CHOICES = [
+        ('pcs', 'Pieces'),
+        ('brass', 'Brass'),
+        ('kg', 'Kilograms'),
+        ('ton', 'Tons'),
+    ]
+    unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default='pcs')
+    
+    current_stock = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    gsb_applicable = models.BooleanField(default=False)  # GSB (special type)
+    last_updated = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+class StockTransaction(models.Model):
+    """Records all stock movements"""
+    TRANSACTION_TYPE = (
+        ('IN', 'Stock In'),
+        ('OUT', 'Stock Out'),
+    )
+    
+    material = models.ForeignKey(BuildingMaterial, on_delete=models.CASCADE, related_name='transactions')
+    transaction_type = models.CharField(max_length=3, choices=TRANSACTION_TYPE)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    date = models.DateTimeField(auto_now_add=True)
+    reference = models.CharField(max_length=50, blank=True)  # Bill/Invoice number reference
+    note = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.transaction_type} - {self.material.name} ({self.quantity})"
+
+    def save(self, *args, **kwargs):
+        """Update inventory stock levels when transaction is saved"""
+        if self.transaction_type == 'IN':
+            self.material.current_stock += self.quantity
+        elif self.transaction_type == 'OUT':
+            self.material.current_stock -= self.quantity
+            
+        self.material.save()
+        super().save(*args, **kwargs)
+        

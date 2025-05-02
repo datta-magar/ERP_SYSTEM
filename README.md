@@ -37,7 +37,7 @@ git clone https://github.com/yourusername/ERP_SYSTEM.git
 cd ERP_SYSTEM
 
 # 2. Setup virtual environment
-python -m venv venv
+python -m venv venv `on mac %python3 -m venv venv`
 source venv/bin/activate    # on Windows: venv\Scripts\activate
 
 # 3. Install dependencies
