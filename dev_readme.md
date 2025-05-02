@@ -135,10 +135,3 @@ refactor/user-model-cleanup
 ---
 
 🧑‍💻 *Thank you for contributing to ERP\_SYSTEM. Clean code, strong communication, and teamwork make great software!*
-
-```
-
----
-
-Let me know if you'd like this saved as a downloadable file or added to your GitHub repo directly.
-
