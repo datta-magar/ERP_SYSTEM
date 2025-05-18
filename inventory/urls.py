@@ -8,4 +8,7 @@ urlpatterns = [
     path('items/', views.material_list, name='item_list'),
     path('items/<int:pk>/', views.material_detail, name='material_detail'),
     # Add other URLs as needed
+    path('items/add/', views.material_create, name='material_create'),  # Add new material
+    path('items/<int:pk>/edit/', views.material_update, name='material_update'),  # Edit material
+
 ]
