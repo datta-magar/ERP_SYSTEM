@@ -57,6 +57,13 @@
                     </a>
                 </li>
 
+                <!-- Add to sidebar after Sales & Billing -->
+                <li class="nav-item mb-2">
+                    <a class="nav-link" href="{% url 'purchase_dashboard' %}">
+                        <i class="bi bi-bag-fill me-2"></i> Purchase
+                    </a>
+                </li>
+
                 <!-- Logout -->
                 <li class="nav-item mt-4">
                     <a class="nav-link text-danger" href="{% url 'logout' %}">
@@ -113,6 +120,18 @@
                         </div>
                     </div>
                 </div>
+                <!-- Add this card to the main dashboard -->
+                <div class="col-md-6 mb-3">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">📦 Purchase Management</h5>
+                            <p class="card-text">
+                            <p class="card-text">Manage suppliers and create purchase orders for stock-in.</p>
+                            <a href="{% url 'purchase_dashboard' %}" class="btn btn-primary">Go to Purchase</a>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="col-md-6 mb-3">
                     <div class="card shadow-sm">
                         <div class="card-body">

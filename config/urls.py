@@ -29,6 +29,7 @@ urlpatterns = [
     path('sales/', include('sales.urls')),
     path('production/',include('production.urls')),
     path('accounts/',include('accounts.urls')),
+    path('purchase/', include('purchase.urls')),
 ]
 
 # Important: Add this OUTSIDE the urlpatterns list
