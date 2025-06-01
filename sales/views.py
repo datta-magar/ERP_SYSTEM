@@ -1,118 +1,262 @@
-'''Datta outliar enhnaced code'''
 # sales/views.py
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import HttpResponse
-from django.template.loader import get_template
-from django.db import transaction
-from num2words import num2words
-
-from .models import Customer, Bill, BillItem
-from .forms import CustomerForm, BillForm, BillItemFormSet
+from django.http import HttpResponse, JsonResponse
+from django.db import transaction as db_transaction
+from django.template.loader import render_to_string
+from django.db.models import Sum, Count, Q
+from .models import Customer, Invoice, InvoiceItem
+from .forms import CustomerForm, InvoiceForm, InvoiceItemFormSet
 from inventory.models import BuildingMaterial, StockTransaction
+import datetime
+from decimal import Decimal
 
-# For PDF generation
-from xhtml2pdf import pisa
-from io import BytesIO
+@login_required
+def sales_dashboard(request):
+    # Get current month data
+    today = datetime.date.today()
+    current_month_start = today.replace(day=1)
+    
+    # Statistics
+    total_customers = Customer.objects.count()
+    monthly_sales = Invoice.objects.filter(
+        date__gte=current_month_start,
+        is_cancelled=False
+    ).aggregate(total=Sum('total_amount'))['total'] or 0
+    
+    pending_invoices = Invoice.objects.filter(is_cancelled=False).count()
+    recent_invoices = Invoice.objects.filter(is_cancelled=False).order_by('-created_at')[:5]
+    
+    # Top selling materials
+    top_materials = InvoiceItem.objects.filter(
+        invoice__is_cancelled=False,
+        invoice__date__gte=current_month_start
+    ).values('material__name').annotate(
+        total_qty=Sum('quantity'),
+        total_amount=Sum('amount')
+    ).order_by('-total_amount')[:5]
+    
+    context = {
+        'total_customers': total_customers,
+        'monthly_sales': monthly_sales,
+        'pending_invoices': pending_invoices,
+        'recent_invoices': recent_invoices,
+        'top_materials': top_materials,
+    }
+    return render(request, 'sales/dashboard.html', context)
 
+# Customer Views
+@login_required
 def customer_list(request):
+    search_query = request.GET.get('search', '')
+    
     customers = Customer.objects.all()
-    return render(request, 'sales/customer_list.html', {'customers': customers})
+    
+    if search_query:
+        customers = customers.filter(
+            Q(name__icontains=search_query) |
+            Q(phone__icontains=search_query) |
+            Q(gstin__icontains=search_query)
+        )
+    
+    context = {
+        'customers': customers,
+        'search_query': search_query,
+    }
+    return render(request, 'sales/customer_list.html', context)
 
+
+@login_required
 def customer_create(request):
     if request.method == 'POST':
         form = CustomerForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Customer added successfully")
-            return redirect('customer_list')
+            customer = form.save()
+            messages.success(request, 'Customer created successfully!')
+            
+            # Check if this is from invoice creation
+            if request.GET.get('next') == 'invoice':
+                return redirect('invoice_create')
+            
+            return redirect('customer_detail', pk=customer.pk)
     else:
         form = CustomerForm()
     
-    return render(request, 'sales/customer_form.html', {'form': form})
-
-def bill_list(request):
-    bills = Bill.objects.all().order_by('-date')
-    return render(request, 'sales/bill_list.html', {'bills': bills})
-
-def bill_detail(request, pk):
-    bill = get_object_or_404(Bill, pk=pk)
-    return render(request, 'sales/bill_detail.html', {'bill': bill})
-
-@transaction.atomic
-def bill_create(request):
-    if request.method == 'POST':
-        form = BillForm(request.POST)
-        
-        if form.is_valid():
-            bill = form.save()
-            
-            # Process the formset (bill items)
-            formset = BillItemFormSet(request.POST, instance=bill)
-            
-            if formset.is_valid():
-                formset.save()
-                
-                # Update inventory for each item
-                for form in formset:
-                    if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
-                        material_name = form.cleaned_data.get('material')
-                        qty = form.cleaned_data.get('qty')
-                        
-                        # Try to find matching material in inventory
-                        try:
-                            material = BuildingMaterial.objects.filter(name__icontains=material_name).first()
-                            if material:
-                                # Create stock transaction
-                                StockTransaction.objects.create(
-                                    material=material,
-                                    transaction_type='OUT',
-                                    quantity=qty,
-                                    reference=f"Bill #{bill.bill_no}"
-                                )
-                        except Exception as e:
-                            print(f"Error updating inventory: {e}")
-                
-                messages.success(request, f"Bill #{bill.bill_no} created successfully!")
-                return redirect('bill_detail', pk=bill.pk)
-    else:
-        form = BillForm()
-        formset = BillItemFormSet()
-    
-    return render(request, 'sales/bill_form.html', {
+    return render(request, 'sales/customer_form.html', {
         'form': form,
-        'formset': formset,
+        'title': 'Add New Customer'
     })
 
-def render_to_pdf(template_src, context_dict):
-    """Generate PDF from HTML template"""
-    template = get_template(template_src)
-    html = template.render(context_dict)
-    result = BytesIO()
-    pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
-    
-    if not pdf.err:
-        return HttpResponse(result.getvalue(), content_type='application/pdf')
-    return None
 
-def generate_bill_pdf(request, pk):
-    """Generate a PDF of the bill"""
-    bill = get_object_or_404(Bill, pk=pk)
+@login_required
+def customer_detail(request, pk):
+    customer = get_object_or_404(Customer, pk=pk)
+    invoices = customer.invoices.filter(is_cancelled=False).order_by('-date')[:10]
     
-    # Convert amount to words
-    amount_in_words = num2words(int(bill.grand_total), lang='en_IN').title()
-    amount_in_words += " Rupees Only"
+    # Calculate total business
+    total_business = invoices.aggregate(total=Sum('total_amount'))['total'] or 0
     
     context = {
-        'bill': bill,
-        'amount_in_words': amount_in_words,
+        'customer': customer,
+        'invoices': invoices,
+        'total_business': total_business,
     }
+    return render(request, 'sales/customer_detail.html', context)
+
+
+@login_required
+def customer_update(request, pk):
+    customer = get_object_or_404(Customer, pk=pk)
     
-    pdf = render_to_pdf('sales/bill_pdf.html', context)
-    if pdf:
-        response = HttpResponse(pdf, content_type='application/pdf')
-        filename = f"Bill_{bill.bill_no}.pdf"
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        return response
+    if request.method == 'POST':
+        form = CustomerForm(request.POST, instance=customer)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Customer updated successfully!')
+            return redirect('customer_detail', pk=customer.pk)
+    else:
+        form = CustomerForm(instance=customer)
     
-    return HttpResponse("Error generating PDF", status=400)
+    return render(request, 'sales/customer_form.html', {
+        'form': form,
+        'customer': customer,
+        'title': 'Edit Customer'
+    })
+
+
+# Invoice Views
+@login_required
+def invoice_list(request):
+    search_query = request.GET.get('search', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    invoices = Invoice.objects.filter(is_cancelled=False)
+    
+    if search_query:
+        invoices = invoices.filter(
+            Q(bill_number__icontains=search_query) |
+            Q(customer__name__icontains=search_query)
+        )
+    
+    if date_from:
+        invoices = invoices.filter(date__gte=date_from)
+    
+    if date_to:
+        invoices = invoices.filter(date__lte=date_to)
+    
+    invoices = invoices.order_by('-date', '-created_at')
+    
+    context = {
+        'invoices': invoices,
+        'search_query': search_query,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    return render(request, 'sales/invoice_list.html', context)
+
+
+@login_required
+@db_transaction.atomic
+def invoice_create(request):
+    if request.method == 'POST':
+        form = InvoiceForm(request.POST)
+        formset = InvoiceItemFormSet(request.POST)
+        
+        if form.is_valid() and formset.is_valid():
+            # Save invoice
+            invoice = form.save()
+            
+            # Save items
+            items = formset.save(commit=False)
+            for item in items:
+                item.invoice = invoice
+                item.save()
+                
+                # Create stock transaction
+                StockTransaction.objects.create(
+                    material=item.material,
+                    transaction_type='OUT',
+                    quantity=item.quantity,
+                    reference=f"INV-{invoice.bill_number}",
+                    note=f"Sale to {invoice.customer.name}"
+                )
+            
+            # Delete removed items
+            for item in formset.deleted_objects:
+                item.delete()
+            
+            # Calculate totals
+            invoice.calculate_totals()
+            
+            messages.success(request, 'Invoice created successfully!')
+            return redirect('invoice_detail', pk=invoice.pk)
+    else:
+        form = InvoiceForm()
+        formset = InvoiceItemFormSet()
+    
+    return render(request, 'sales/invoice_form.html', {
+        'form': form,
+        'formset': formset,
+        'title': 'Create Invoice'
+    })
+
+
+@login_required
+def invoice_detail(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk)
+    return render(request, 'sales/invoice_detail.html', {'invoice': invoice})
+
+
+@login_required
+def invoice_print(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk)
+    return render(request, 'sales/invoice_print.html', {'invoice': invoice})
+
+
+@login_required
+def invoice_cancel(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk)
+    
+    if request.method == 'POST':
+        reason = request.POST.get('cancellation_reason', '')
+        
+        with db_transaction.atomic():
+            # Reverse stock transactions
+            for item in invoice.items.all():
+                StockTransaction.objects.create(
+                    material=item.material,
+                    transaction_type='IN',
+                    quantity=item.quantity,
+                    reference=f"CANCELLED-INV-{invoice.bill_number}",
+                    note=f"Cancelled invoice - {reason}"
+                )
+            
+            # Mark invoice as cancelled
+            invoice.is_cancelled = True
+            invoice.cancellation_reason = reason
+            invoice.save()
+        
+        messages.success(request, 'Invoice cancelled successfully!')
+        return redirect('invoice_list')
+    
+    return render(request, 'sales/invoice_cancel.html', {'invoice': invoice})
+
+
+# AJAX Views
+@login_required
+def get_material_details(request, material_id):
+    """AJAX view to get material details"""
+    try:
+        material = BuildingMaterial.objects.get(pk=material_id)
+        data = {
+            'success': True,
+            'unit': material.unit,
+            'selling_price': str(material.selling_price),
+            'current_stock': str(material.current_stock)
+        }
+    except BuildingMaterial.DoesNotExist:
+        data = {'success': False}
+    
+    return JsonResponse(data)

@@ -42,7 +42,7 @@
             <h4 class="text-white mb-4">🔧 ERP System</h4>
             <ul class="nav flex-column">
                 <li class="nav-item mb-2">
-                    <a class="nav-link" href="{% url 'employee_list' %}">
+                    <a class="nav-link" href="{% url 'hr_dashboard' %}">
                         <i class="bi bi-people-fill me-2"></i> HR Module
                     </a>
                 </li>
@@ -52,8 +52,8 @@
                     </a>
                 </li>
                 <li class="nav-item mb-2">
-                    <a class="nav-link" href="{% url 'sales:bill_list' %}">
-                        <i class="bi bi-file-earmark-text me-2"></i> Sales & Billing
+                    <a class="nav-link" href="{% url 'sales_dashboard' %}">
+                        <i class="bi bi-cart-fill me-2"></i> Sales & Billing
                     </a>
                 </li>
 
@@ -100,16 +100,16 @@
                         <div class="card-body">
                             <h5 class="card-title">👥 HR Module</h5>
                             <p class="card-text">View and manage employee records.</p>
-                            <a href="{% url 'employee_list' %}" class="btn btn-primary">Go to HR</a>
+                            <a href="{% url 'hr_dashboard' %}" class="btn btn-primary">Go to HR</a>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6 mb-3">
                     <div class="card shadow-sm">
                         <div class="card-body">
-                            <h5 class="card-title">🧾 Sales & Billing</h5>
-                            <p class="card-text">Create invoices and manage customer billing records.</p>
-                            <a href="{% url 'sales:bill_list' %}" class="btn btn-primary">Go to Billing</a>
+                            <h5 class="card-title">💰 Sales & Billing</h5>
+                            <p class="card-text">Manage customers, create invoices, and track sales.</p>
+                            <a href="{% url 'sales_dashboard' %}" class="btn btn-primary">Go to Sales</a>
                         </div>
                     </div>
                 </div>

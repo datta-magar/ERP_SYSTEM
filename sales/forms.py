@@ -1,39 +1,69 @@
-'''Datta outliar enhnaced code'''
 # sales/forms.py
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Customer, Bill, BillItem
+from .models import Customer, Invoice, InvoiceItem
+from inventory.models import BuildingMaterial
+import datetime
 
 class CustomerForm(forms.ModelForm):
     class Meta:
         model = Customer
-        fields = ['name', 'address', 'gstin', 'phone']
+        fields = ['name', 'gstin', 'phone', 'email', 'address_site']
         widgets = {
-            'address': forms.Textarea(attrs={'rows': 3}),
+            'name': forms.TextInput(attrs={'placeholder': 'Customer Name'}),
+            'gstin': forms.TextInput(attrs={'placeholder': 'GSTIN (optional)'}),
+            'phone': forms.TextInput(attrs={'placeholder': 'Phone Number'}),
+            'email': forms.EmailInput(attrs={'placeholder': 'Email (optional)'}),
+            'address_site': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Site/Delivery Address'}),
         }
 
-class BillForm(forms.ModelForm):
+
+class InvoiceForm(forms.ModelForm):
     class Meta:
-        model = Bill
-        fields = ['customer', 'bill_no', 'date', 'site_address', 'gstin_no']
+        model = Invoice
+        fields = ['customer', 'date', 'gst_rate', 'authorized_signatory']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
-            'site_address': forms.Textarea(attrs={'rows': 3}),
+            'gst_rate': forms.NumberInput(attrs={'step': '0.01'}),
+            'authorized_signatory': forms.TextInput(attrs={'placeholder': 'Authorized Signatory'}),
         }
 
-class BillItemForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['date'].initial = datetime.date.today()
+
+
+class InvoiceItemForm(forms.ModelForm):
     class Meta:
-        model = BillItem
-        fields = ['date', 'challan_no', 'material', 'qty', 'rate']
+        model = InvoiceItem
+        fields = ['date', 'challan_number', 'material', 'quantity', 'rate']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'item-date'}),
+            'challan_number': forms.TextInput(attrs={'placeholder': 'Challan No.'}),
+            'material': forms.Select(attrs={'class': 'material-select'}),
+            'quantity': forms.NumberInput(attrs={'step': '0.01', 'class': 'quantity-input'}),
+            'rate': forms.NumberInput(attrs={'step': '0.01', 'class': 'rate-input'}),
         }
 
-# Create a formset for multiple bill items
-BillItemFormSet = inlineformset_factory(
-    Bill, 
-    BillItem,
-    form=BillItemForm,
-    extra=5,  # Start with 5 empty forms
-    can_delete=True
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['date'].initial = datetime.date.today()
+        
+        # Add material info to dropdown
+        materials = BuildingMaterial.objects.all()
+        self.fields['material'].queryset = materials
+        choices = [(m.id, f"{m.name} (Stock: {m.current_stock} {m.unit})") for m in materials]
+        choices.insert(0, ('', '---------'))
+        self.fields['material'].choices = choices
+
+
+# Formset for invoice items
+InvoiceItemFormSet = inlineformset_factory(
+    Invoice, 
+    InvoiceItem,
+    form=InvoiceItemForm,
+    extra=1,
+    can_delete=True,
+    min_num=1,
+    validate_min=True
 )
